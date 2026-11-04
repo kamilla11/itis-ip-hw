@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Задача 4. Ханойская башня
+
+trap 'printf "\nДля выхода введите q или Q.\n"' INT
+
+A=(8 7 6 5 4 3 2 1)
+B=()
+C=()
+moves=0
+
+print_stacks() {
+    local row index rod size value
+    for ((row = 0; row < 8; row++)); do
+        for rod in A B C; do
+            local -n stack="$rod"
+            size=${#stack[@]}
+            index=$((7 - row))
+            value=' '
+            if ((index < size)); then value=${stack[index]}; fi
+            printf '|%s| ' "$value"
+            unset -n stack
+        done
+        printf '\n'
+    done
+    printf '+-+ +-+ +-+\n A   B   C\n'
+}
+
+print_stacks
+while true; do
+    if IFS= read -r -p "Ход № $((moves + 1)) (откуда, куда): " answer; then
+        :
+    else
+        read_status=$?
+        if ((read_status > 128)); then continue; fi
+        printf '\nВвод закрыт.\n'
+        exit 1
+    fi
+
+    compact=${answer//[[:space:]]/}
+    case "$compact" in
+        q|Q) printf 'Выход из игры.\n'; exit 1 ;;
+    esac
+    if [[ ! $compact =~ ^[aAbBcC][aAbBcC]$ ]]; then
+        printf 'Ошибка: введите две буквы A, B или C, например: ab или A c.\n'
+        continue
+    fi
+
+    compact=${compact^^}
+    from=${compact:0:1}
+    to=${compact:1:1}
+    if [[ $from == "$to" ]]; then
+        printf 'Ошибка: выберите два разных стека.\n'
+        continue
+    fi
+
+    declare -n source_stack="$from"
+    declare -n target_stack="$to"
+    if ((${#source_stack[@]} == 0)); then
+        printf 'Невозможно переместить диск: стек %s пуст.\n' "$from"
+        unset -n source_stack target_stack
+        continue
+    fi
+
+    source_top=${source_stack[${#source_stack[@]}-1]}
+    if ((${#target_stack[@]} > 0)); then
+        target_top=${target_stack[${#target_stack[@]}-1]}
+        if ((source_top > target_top)); then
+            printf 'Такое перемещение запрещено! Нельзя класть больший диск на меньший.\n'
+            unset -n source_stack target_stack
+            continue
+        fi
+    fi
+
+    last_index=$((${#source_stack[@]} - 1))
+    unset "source_stack[$last_index]"
+    target_stack+=("$source_top")
+    unset -n source_stack target_stack
+    ((moves += 1))
+    print_stacks
+
+    if ((${#B[@]} == 8 || ${#C[@]} == 8)); then
+        printf 'Победа! Башня собрана за %d ходов.\n' "$moves"
+        exit 0
+    fi
+done

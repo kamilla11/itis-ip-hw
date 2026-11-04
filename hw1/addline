@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Задача 9. Добавление строки в начало текстового файла
+
+(($# == 1)) || { printf 'Использование: %s dir_path\n' "$0" >&2; exit 2; }
+[[ -d $1 ]] || { printf 'Ошибка: каталог не существует.\n' >&2; exit 2; }
+
+dir=$1
+header="Approved $(id -un) $(date -I)"
+failed=0
+shopt -s dotglob nullglob
+
+for file in "$dir"/*.txt; do
+    [[ -f $file && ! -L $file ]] || continue
+    temp=$(mktemp "$dir/.addline.XXXXXXXX") || { failed=1; continue; }
+    if { printf '%s\n' "$header"; cat -- "$file"; } > "$temp" &&
+       chmod --reference="$file" "$temp" &&
+       mv -- "$temp" "$file"; then
+        printf 'Обработано: %s\n' "$file"
+    else
+        printf 'Ошибка обработки: %s\n' "$file" >&2
+        rm -f -- "$temp"
+        failed=1
+    fi
+done
+exit "$failed"

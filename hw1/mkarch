@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Задача 5. Самораспаковывающийся архив
+
+set -o pipefail
+
+usage() { printf 'Использование: %s -d dir_path -n name\n' "$0" >&2; }
+error() { printf 'Ошибка: %s\n' "$*" >&2; exit 1; }
+
+dir=''
+name=''
+while (($# > 0)); do
+    case "$1" in
+        -d|-n)
+            (($# >= 2)) || { usage; exit 2; }
+            if [[ $1 == -d ]]; then dir=$2; else name=$2; fi
+            shift 2 ;;
+        *) usage; exit 2 ;;
+    esac
+done
+[[ -n $dir && -n $name ]] || { usage; exit 2; }
+[[ -d $dir ]] || error "каталог '$dir' не найден"
+[[ $name != */* && $name != . && $name != .. ]] || error 'name должен быть именем файла без /'
+[[ -e $name || -L $name ]] && error "файл '$name' уже существует"
+
+target=$PWD/$name
+
+payload=$(mktemp) || error 'не удалось создать временный файл'
+trap 'rm -f -- "$payload"' EXIT
+if ! tar -czf - -C "$dir" . | base64 --wrap=76 > "$payload"; then
+    error 'не удалось упаковать каталог'
+fi
+
+if ! cat > "$target" <<'EXTRACTOR'
+#!/usr/bin/env bash
+set -o pipefail
+
+out='.'
+case $# in
+    0) ;;
+    2) [[ $1 == -o && -n $2 ]] || { printf 'Использование: %s [-o unpackdir]\n' "$0" >&2; exit 2; }
+       out=$2 ;;
+    *) printf 'Использование: %s [-o unpackdir]\n' "$0" >&2; exit 2 ;;
+esac
+mkdir -p -- "$out" || exit 1
+awk '/^__ARCHIVE_BELOW__$/ {payload=1; next} payload {print}' "${BASH_SOURCE[0]}" |
+    base64 --decode | tar -xz -C "$out"
+exit $?
+__ARCHIVE_BELOW__
+EXTRACTOR
+then
+    error "не удалось создать '$target'"
+fi
+
+if ! cat -- "$payload" >> "$target"; then
+    rm -f -- "$target"
+    error 'не удалось создать архив'
+fi
+if ! chmod a+x -- "$target"; then
+    rm -f -- "$target"
+    error 'не удалось сделать архив исполняемым'
+fi
+printf 'Архив создан: %s\n' "$target"

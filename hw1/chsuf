@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Задача 7. Изменение суффикса в именах файлов
+
+usage() { printf 'Использование: %s dir_path old_suffix new_suffix\n' "$0" >&2; }
+valid_suffix() {
+    local suf=$1
+    [[ $suf == .* && ${#suf} -ge 2 && ${suf:1} != *.* && $suf != */* ]]
+}
+
+(($# == 3)) || { usage; exit 2; }
+dir=$1
+old_suffix=$2
+new_suffix=$3
+[[ -d $dir ]] || { printf 'Ошибка: каталог не существует.\n' >&2; exit 2; }
+valid_suffix "$old_suffix" && valid_suffix "$new_suffix" || {
+    printf 'Ошибка: суффикс должен начинаться с точки и не содержать других точек.\n' >&2
+    exit 2
+}
+
+failed=0
+while IFS= read -r -d '' file; do
+    base=${file##*/}
+    prefix=${base%.*}
+    [[ -n $prefix && $base == *"$old_suffix" ]] || continue
+    new_base=${base/%"$old_suffix"/"$new_suffix"}
+    destination=${file%/*}/$new_base
+    if [[ -e $destination || -L $destination ]]; then
+        printf 'Пропущено: файл уже существует: %s\n' "$destination" >&2
+        failed=1
+        continue
+    fi
+    if mv -- "$file" "$destination"; then
+        printf '%s -> %s\n' "$file" "$destination"
+    else
+        failed=1
+    fi
+done < <(find "$dir" -type f -print0)
+exit "$failed"

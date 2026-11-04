@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Задача 1. Экстрасенс
+
+RED=$'\033[31m'
+GREEN=$'\033[32m'
+RESET=$'\033[0m'
+
+step=1
+hits=0
+misses=0
+history_numbers=()
+history_hits=()
+
+while true; do
+    secret=$((RANDOM % 10))
+    printf 'Step: %d\n' "$step"
+
+    while true; do
+        if ! IFS= read -r -p 'Please enter number from 0 to 9 (q - quit): ' guess; then
+            printf '\nInput closed. Bye!\n'
+            exit 0
+        fi
+        case "$guess" in
+            q) printf 'Bye!\n'; exit 0 ;;
+            [0-9]) break ;;
+            *) printf 'Invalid input. Please enter a single digit from 0 to 9 or q.\n' ;;
+        esac
+    done
+
+    if [[ "$guess" == "$secret" ]]; then
+        printf 'Hit! My number: %d\n' "$secret"
+        ((hits += 1))
+        history_hits+=(1)
+    else
+        printf 'Miss! My number: %d\n' "$secret"
+        ((misses += 1))
+        history_hits+=(0)
+    fi
+    history_numbers+=("$secret")
+
+    total=$((hits + misses))
+    printf 'Hit: %d%% Miss: %d%%\n' "$((hits * 100 / total))" "$((misses * 100 / total))"
+    printf 'Numbers:'
+    first=0
+    start=0
+    if ((${#history_numbers[@]} > 10)); then
+        start=$((${#history_numbers[@]} - 10))
+    fi
+    for ((i = start; i < ${#history_numbers[@]}; i++)); do
+        if ((history_hits[i] == 1)); then
+            color=$GREEN
+        else
+            color=$RED
+        fi
+        printf ' %s%s%s' "$color" "${history_numbers[i]}" "$RESET"
+    done
+    printf '\n\n'
+    ((step += 1))
+done

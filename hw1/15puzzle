@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# Задача 3. Игра в 15
+
+board=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 0)
+blank=15
+moves=0
+
+neighbors_of_blank() {
+    neighbors=()
+    local row=$((blank / 4)) col=$((blank % 4))
+    ((row > 0)) && neighbors+=($((blank - 4)))
+    ((row < 3)) && neighbors+=($((blank + 4)))
+    ((col > 0)) && neighbors+=($((blank - 1)))
+    ((col < 3)) && neighbors+=($((blank + 1)))
+}
+
+move_tile_at() {
+    local position=$1
+    board[blank]=${board[position]}
+    board[position]=0
+    blank=$position
+}
+
+is_solved() {
+    local i
+    for ((i = 0; i < 15; i++)); do
+        ((board[i] == i + 1)) || return 1
+    done
+    ((board[15] == 0))
+}
+
+print_board() {
+    local i value
+    printf '+----+----+----+----+\n'
+    for ((i = 0; i < 16; i++)); do
+        value=${board[i]}
+        if ((value == 0)); then value=' '; fi
+        printf '| %2s ' "$value"
+        if ((i % 4 == 3)); then
+            printf '|\n+----+----+----+----+\n'
+        fi
+    done
+}
+
+# PUZZLE_SHUFFLE_MOVES=1
+shuffle_steps=${PUZZLE_SHUFFLE_MOVES:-300}
+if [[ ! $shuffle_steps =~ ^[0-9]+$ ]] || ((shuffle_steps < 1)); then
+    printf 'Ошибка: PUZZLE_SHUFFLE_MOVES должно быть положительным числом.\n' >&2
+    exit 2
+fi
+last_blank=-1
+for ((turn = 0; turn < shuffle_steps; turn++)); do
+    neighbors_of_blank
+    choices=()
+    for position in "${neighbors[@]}"; do
+        ((position == last_blank)) || choices+=("$position")
+    done
+    if ((${#choices[@]} == 0)); then choices=("${neighbors[@]}"); fi
+    old_blank=$blank
+    chosen=${choices[RANDOM % ${#choices[@]}]}
+    move_tile_at "$chosen"
+    last_blank=$old_blank
+done
+if is_solved; then
+    neighbors_of_blank
+    move_tile_at "${neighbors[0]}"
+fi
+
+while true; do
+    printf '\nХод № %d\n' "$((moves + 1))"
+    print_board
+    if ! IFS= read -r -p 'Ваш ход (q - выход): ' chosen_number; then
+        printf '\nВвод закрыт.\n'
+        exit 0
+    fi
+    if [[ $chosen_number == q ]]; then
+        printf 'Выход. Сделано ходов: %d\n' "$moves"
+        exit 0
+    fi
+    if [[ ! $chosen_number =~ ^([1-9]|1[0-5])$ ]]; then
+        printf 'Неверный ввод! Выберите число от 1 до 15 либо q.\n'
+        continue
+    fi
+
+    chosen_index=-1
+    for ((i = 0; i < 16; i++)); do
+        if ((board[i] == chosen_number)); then
+            chosen_index=$i
+            break
+        fi
+    done
+    neighbors_of_blank
+    allowed=0
+    for position in "${neighbors[@]}"; do
+        if ((position == chosen_index)); then
+            allowed=1
+            break
+        fi
+    done
+    if ((allowed == 0)); then
+        printf 'Неверный ход! Невозможно передвинуть костяшку %s.\n' "$chosen_number"
+        printf 'Можно выбрать:'
+        for position in "${neighbors[@]}"; do printf ' %d' "${board[position]}"; done
+        printf '\n'
+        continue
+    fi
+
+    move_tile_at "$chosen_index"
+    ((moves += 1))
+    if is_solved; then
+        printf 'Вы собрали головоломку за %d ходов.\n' "$moves"
+        print_board
+        exit 0
+    fi
+done

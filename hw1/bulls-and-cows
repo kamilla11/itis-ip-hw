@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# Задача 2. Быки и коровы
+
+trap 'printf "\nДля выхода введите q или Q.\n"' INT
+
+secret=$((RANDOM % 9 + 1))
+while ((${#secret} < 4)); do
+    digit=$((RANDOM % 10))
+    if [[ "$secret" != *"$digit"* ]]; then
+        secret+=$digit
+    fi
+done
+
+attempts=()
+cows_history=()
+bulls_history=()
+
+printf '%s\n' \
+    '********************************************************************************' \
+    '* Я загадал 4-значное число с неповторяющимися цифрами. На каждом ходу делайте *' \
+    '* попытку отгадать загаданное число. Попытка - это 4-значное число с           *' \
+    '* неповторяющимися цифрами.                                                    *' \
+    '********************************************************************************'
+printf '\n'
+
+while true; do
+    next=$((${#attempts[@]} + 1))
+    if IFS= read -r -p "Попытка $next: " guess; then
+        :
+    else
+        read_status=$?
+        if ((read_status > 128)); then
+            continue
+        fi
+        printf '\nВвод закрыт.\n'
+        exit 1
+    fi
+
+    case "$guess" in
+        q|Q) printf 'Выход из игры.\n'; exit 1 ;;
+    esac
+
+    if [[ ! "$guess" =~ ^[1-9][0-9]{3}$ ]]; then
+        printf 'Ошибка: нужно четырёхзначное число без повторяющихся цифр.\n'
+        continue
+    fi
+
+    seen=''
+    unique=1
+    for ((i = 0; i < 4; i++)); do
+        digit=${guess:i:1}
+        if [[ "$seen" == *"$digit"* ]]; then
+            unique=0
+            break
+        fi
+        seen+=$digit
+    done
+    if ((unique == 0)); then
+        printf 'Ошибка: цифры не должны повторяться.\n'
+        continue
+    fi
+
+    bulls=0
+    cows=0
+    for ((i = 0; i < 4; i++)); do
+        digit=${guess:i:1}
+        if [[ "$digit" == "${secret:i:1}" ]]; then
+            ((bulls += 1))
+        elif [[ "$secret" == *"$digit"* ]]; then
+            ((cows += 1))
+        fi
+    done
+
+    attempts+=("$guess")
+    cows_history+=("$cows")
+    bulls_history+=("$bulls")
+    printf 'Коров - %d Быков - %d\n' "$cows" "$bulls"
+    printf '\nИстория ходов:\n'
+    for ((i = 0; i < ${#attempts[@]}; i++)); do
+        printf '%d. %s (Коров - %d Быков - %d)\n' \
+            "$((i + 1))" "${attempts[i]}" "${cows_history[i]}" "${bulls_history[i]}"
+    done
+    printf '\n'
+
+    if ((bulls == 4)); then
+        printf 'Вы угадали число %s за %d попыток!\n' "$secret" "${#attempts[@]}"
+        exit 0
+    fi
+done

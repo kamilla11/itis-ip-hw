@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Задача 8. Статистика по суффиксам имен файлов
+
+(($# == 1)) || { printf 'Использование: %s dir_path\n' "$0" >&2; exit 2; }
+[[ -d $1 ]] || { printf 'Ошибка: каталог не существует.\n' >&2; exit 2; }
+
+declare -A counts=()
+while IFS= read -r -d '' file; do
+    base=${file##*/}
+    prefix=${base%.*}
+    suffix=${base##*.}
+    if [[ -z $prefix || $prefix == "$base" || -z $suffix ]]; then
+        key='no suffix'
+    else
+        key=.$suffix
+    fi
+    counts["$key"]=$(( ${counts["$key"]:-0} + 1 ))
+done < <(find "$1" -type f -print0)
+
+# Сортировка по количеству по убыванию, одинаковые значения по имени
+for key in "${!counts[@]}"; do
+    printf '%s\t%d\n' "$key" "${counts[$key]}"
+done | LC_ALL=C sort -t $'\t' -k2,2nr -k1,1 |
+while IFS=$'\t' read -r suffix count; do
+    printf '%s: %d\n' "$suffix" "$count"
+done
